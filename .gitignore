@@ -1,0 +1,12 @@
+build/
+_deps/
+*.vcxproj.user
+*.exe
+*.obj
+*.pdb
+*.log
+.vs/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+*.spv
