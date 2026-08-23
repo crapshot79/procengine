@@ -6,6 +6,7 @@ int runTestWorldSeed();
 int runTestChunkGenerator();
 int runTestChunkDump();
 int runTestChunkPlacer();
+int runTestChunkStreamer();
 
 }
 
@@ -18,6 +19,8 @@ int main() {
     total += procengine::runTestChunkDump();
     std::printf("\n");
     total += procengine::runTestChunkPlacer();
+    std::printf("\n");
+    total += procengine::runTestChunkStreamer();
 
     std::printf("\nTotal failures: %d\n", total);
     return total == 0 ? 0 : 1;
