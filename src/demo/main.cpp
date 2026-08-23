@@ -49,6 +49,7 @@ int main(int argc, char* argv[]) {
         std::cout << "=== M1 Persistent World ===" << std::endl;
         std::cout << "  WASD: move  Mouse: look  SPACE/SHIFT: up/down" << std::endl;
         std::cout << "  E: remove nearest tree" << std::endl;
+        std::cout << "  R: place persistent rock ahead" << std::endl;
         std::cout << "  Save dir: saves/  Seed: " << worldSeed << std::endl;
         std::cout << "============================" << std::endl;
 
@@ -106,6 +107,52 @@ int main(int argc, char* argv[]) {
                 } else {
                     std::cout << "  No tree in range" << std::endl;
                 }
+            }
+
+            if (input.isKeyPressed(SDLK_R)) {
+                glm::vec3 camPos = camera.getPosition();
+                float yawRad = camera.getYaw() * 3.14159265f / 180.0f;
+                float pitchRad = camera.getPitch() * 3.14159265f / 180.0f;
+
+                glm::vec3 forward(
+                    std::cos(yawRad) * std::cos(pitchRad),
+                    std::sin(pitchRad),
+                    std::sin(yawRad) * std::cos(pitchRad));
+                forward = glm::normalize(forward);
+
+                float placeDist = 5.0f;
+                glm::vec3 placePos = camPos + forward * placeDist;
+
+                float terrainH = ChunkGenerator::queryHeight(worldSeed, placePos.x, placePos.z, heightScale);
+                placePos.y = terrainH;
+
+                ChunkCoord placeCC = streamer.worldToChunk(placePos.x, placePos.z);
+
+                uint64_t posKey = static_cast<uint64_t>(
+                    (static_cast<uint32_t>(static_cast<int>(placePos.x * 100)) * 73856093ULL) ^
+                    (static_cast<uint32_t>(static_cast<int>(placePos.z * 100)) * 19349663ULL));
+                uint64_t domainTag = 0x504C4143524F434BULL;
+                ObjectId oid = makeObjectId(worldSeed, placeCC, domainTag, posKey);
+
+                StoredObject stored;
+                stored.idHi = oid.hi;
+                stored.idLo = oid.lo;
+                stored.type = 2;
+                stored.posX = placePos.x;
+                stored.posY = placePos.y;
+                stored.posZ = placePos.z;
+                stored.rotY = 0.0f;
+                stored.scaleX = 1.0f;
+                stored.scaleY = 1.0f;
+                stored.scaleZ = 1.0f;
+                stored.seed = posKey;
+
+                store.addObject(placeCC, stored);
+                streamer.reloadChunk(placeCC, renderer);
+
+                std::cout << "  Placed rock at (" << placePos.x << ", "
+                          << placePos.y << ", " << placePos.z
+                          << ") in chunk (" << placeCC.x << "," << placeCC.z << ")" << std::endl;
             }
 
             streamer.update(camera.getPosition(), renderer);

@@ -40,6 +40,7 @@ public:
 
     const std::unordered_map<ChunkCoord, ChunkState, ChunkCoordHash>& getLoaded() const { return loaded_; }
     size_t loadedCount() const { return loaded_.size(); }
+    float getChunkSize() const { return chunkSize_; }
 
     void shutdown(class Renderer& renderer);
 

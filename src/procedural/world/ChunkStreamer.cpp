@@ -102,6 +102,35 @@ void ChunkStreamer::loadChunk(const ChunkCoord& cc, Renderer& renderer) {
         state.objectGpus.push_back(og);
     }
 
+    if (store_) {
+        auto& added = store_->getAddedObjects(cc);
+        for (const auto& stored : added) {
+            MeshData objMesh;
+            if (stored.type == 1) {
+                objMesh = treeGen.generate(stored.seed);
+            } else {
+                objMesh = rockGen.generate(stored.seed);
+            }
+
+            float meshMinY = computeMeshMinY(objMesh);
+            float worldY = stored.posY - meshMinY;
+
+            glm::mat4 xform = glm::mat4(1.0f);
+            xform = glm::translate(xform, glm::vec3(stored.posX, worldY, stored.posZ));
+            if (stored.rotY != 0.0f) {
+                xform = glm::rotate(xform, stored.rotY, glm::vec3(0, 1, 0));
+            }
+            if (stored.scaleX != 1.0f || stored.scaleY != 1.0f || stored.scaleZ != 1.0f) {
+                xform = glm::scale(xform, glm::vec3(stored.scaleX, stored.scaleY, stored.scaleZ));
+            }
+
+            ChunkState::ObjectGpu og;
+            og.mesh = renderer.uploadMesh(objMesh);
+            og.transform = xform;
+            state.objectGpus.push_back(og);
+        }
+    }
+
     loaded_[cc] = std::move(state);
 }
 
