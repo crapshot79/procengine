@@ -1,4 +1,5 @@
 #include "procedural/world/ChunkStreamer.h"
+#include "procedural/world/WorldStore.h"
 #include "procedural/vegetation/TreeGenerator.h"
 #include "procedural/rock/RockGenerator.h"
 #include "engine/renderer/Renderer.h"
@@ -50,6 +51,11 @@ void ChunkStreamer::update(const glm::vec3& cameraPos, Renderer& renderer) {
     }
 }
 
+void ChunkStreamer::reloadChunk(const ChunkCoord& cc, Renderer& renderer) {
+    unloadChunk(cc, renderer);
+    loadChunk(cc, renderer);
+}
+
 void ChunkStreamer::loadChunk(const ChunkCoord& cc, Renderer& renderer) {
     ChunkGenerator gen;
     ChunkPlacer placer;
@@ -60,9 +66,24 @@ void ChunkStreamer::loadChunk(const ChunkCoord& cc, Renderer& renderer) {
     state.mesh = gen.generate(world_, cc, chunkSize_, ChunkGenerator::DEFAULT_GRID_SIZE, heightScale_);
     state.placements = placer.place(world_, cc);
 
+    std::vector<uint64_t> removedKeys;
+    if (store_) {
+        removedKeys = store_->getRemovals(cc);
+    }
+
+    auto isRemoved = [&](const PlacedObject& obj) -> bool {
+        uint64_t key = (obj.id.hi << 1) ^ obj.id.lo;
+        for (uint64_t rk : removedKeys) {
+            if (rk == key) return true;
+        }
+        return false;
+    };
+
     state.terrainMesh = renderer.uploadMesh(state.mesh);
 
     for (const auto& obj : state.placements) {
+        if (isRemoved(obj)) continue;
+
         MeshData objMesh;
         if (obj.type == PlacedType::Tree) {
             objMesh = treeGen.generate(obj.seed);

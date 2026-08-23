@@ -9,10 +9,12 @@
 #include "procedural/world/ChunkGenerator.h"
 #include "procedural/world/ChunkPlacer.h"
 #include "procedural/world/ChunkStreamer.h"
+#include "procedural/world/WorldStore.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
+#include <cmath>
 
 using namespace procengine;
 
@@ -20,7 +22,7 @@ int main(int argc, char* argv[]) {
     try {
         Seed worldSeed = 42;
 
-        Window window(1280, 720, "ProcEngine - M1 streaming chunks");
+        Window window(1280, 720, "ProcEngine - M1 persistent world");
         Renderer renderer(window.getHandle());
         Input input;
         Camera camera;
@@ -29,7 +31,11 @@ int main(int argc, char* argv[]) {
         constexpr float heightScale = 6.0f;
         constexpr int   loadRadius  = 1;
 
+        WorldStore store(worldSeed, "saves");
+        store.loadAll();
+
         ChunkStreamer streamer(worldSeed, chunkSize, heightScale, loadRadius);
+        streamer.setWorldStore(&store);
 
         camera.setPosition(glm::vec3(16.0f, 20.0f, 16.0f));
         camera.setYaw(-90.0f);
@@ -39,6 +45,12 @@ int main(int argc, char* argv[]) {
         bool running = true;
         uint64_t lastTime = SDL_GetTicks();
         uint32_t frameCount = 0;
+
+        std::cout << "=== M1 Persistent World ===" << std::endl;
+        std::cout << "  WASD: move  Mouse: look  SPACE/SHIFT: up/down" << std::endl;
+        std::cout << "  E: remove nearest tree" << std::endl;
+        std::cout << "  Save dir: saves/  Seed: " << worldSeed << std::endl;
+        std::cout << "============================" << std::endl;
 
         while (running) {
             uint64_t currentTime = SDL_GetTicks();
@@ -61,6 +73,40 @@ int main(int argc, char* argv[]) {
             if (input.isKeyDown(SDLK_LSHIFT)) camera.moveDown(dt);
 
             if (input.isKeyDown(SDLK_ESCAPE)) running = false;
+
+            if (input.isKeyPressed(SDLK_E)) {
+                glm::vec3 camPos = camera.getPosition();
+                float bestDist = 15.0f;
+                PlacedObject bestTree{};
+                bool found = false;
+                ChunkCoord bestCC{};
+
+                for (auto& [cc, state] : streamer.getLoaded()) {
+                    for (const auto& obj : state.placements) {
+                        if (obj.type != PlacedType::Tree) continue;
+                        float dx = obj.position.x - camPos.x;
+                        float dy = obj.position.y - camPos.y;
+                        float dz = obj.position.z - camPos.z;
+                        float dist = std::sqrt(dx*dx + dy*dy + dz*dz);
+                        if (dist < bestDist) {
+                            bestDist = dist;
+                            bestTree = obj;
+                            bestCC = cc;
+                            found = true;
+                        }
+                    }
+                }
+
+                if (found) {
+                    store.addRemoval(bestCC, bestTree.id.hi, bestTree.id.lo);
+                    streamer.reloadChunk(bestCC, renderer);
+                    std::cout << "  Removed tree at (" << bestTree.position.x
+                              << ", " << bestTree.position.y << ", "
+                              << bestTree.position.z << ")" << std::endl;
+                } else {
+                    std::cout << "  No tree in range" << std::endl;
+                }
+            }
 
             streamer.update(camera.getPosition(), renderer);
 

@@ -10,3 +10,5 @@ CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 *.spv
+saves/
+test_saves/

@@ -12,6 +12,8 @@
 
 namespace procengine {
 
+class WorldStore;
+
 struct ChunkState {
     MeshData mesh;
     std::vector<PlacedObject> placements;
@@ -25,22 +27,16 @@ struct ChunkState {
     std::vector<ObjectGpu> objectGpus;
 };
 
-struct ChunkCoordHash {
-    size_t operator()(const ChunkCoord& cc) const {
-        uint64_t h = static_cast<uint64_t>(static_cast<uint32_t>(cc.x));
-        uint64_t z = static_cast<uint64_t>(static_cast<uint32_t>(cc.z));
-        h ^= z + 0x9E3779B97F4A7C15ULL + (h << 6) + (h >> 2);
-        return static_cast<size_t>(h);
-    }
-};
-
 class ChunkStreamer {
 public:
     ChunkStreamer(WorldSeed world, float chunkSize, float heightScale, int loadRadius);
 
+    void setWorldStore(WorldStore* store) { store_ = store; }
+
     ChunkCoord worldToChunk(float wx, float wz) const;
 
     void update(const glm::vec3& cameraPos, class Renderer& renderer);
+    void reloadChunk(const ChunkCoord& cc, Renderer& renderer);
 
     const std::unordered_map<ChunkCoord, ChunkState, ChunkCoordHash>& getLoaded() const { return loaded_; }
     size_t loadedCount() const { return loaded_.size(); }
@@ -55,6 +51,7 @@ private:
     float chunkSize_;
     float heightScale_;
     int loadRadius_;
+    WorldStore* store_ = nullptr;
     std::unordered_map<ChunkCoord, ChunkState, ChunkCoordHash> loaded_;
 };
 
