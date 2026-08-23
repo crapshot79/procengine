@@ -139,4 +139,36 @@ float ChunkGenerator::queryHeight(WorldSeed world, float wx, float wz, float hei
     return terrainHeight(world, wx, wz, heightScale);
 }
 
+void ChunkGenerator::applyDeltas(MeshData& mesh, const std::vector<TerrainDelta>& deltas,
+                                  int gridSize, float chunkSize, float heightScale) {
+    int stride = gridSize + 1;
+    for (const auto& td : deltas) {
+        if (td.localX < 0 || td.localX > gridSize) continue;
+        if (td.localZ < 0 || td.localZ > gridSize) continue;
+        int idx = td.localZ * stride + td.localX;
+        mesh.vertices[idx].pos.y = td.newHeight;
+    }
+}
+
+void ChunkGenerator::recomputeNormalsAndColors(MeshData& mesh, int gridSize, float chunkSize,
+                                                float heightScale) {
+    int stride = gridSize + 1;
+    float spacing = chunkSize / static_cast<float>(gridSize);
+
+    for (int zi = 0; zi <= gridSize; ++zi) {
+        for (int xi = 0; xi <= gridSize; ++xi) {
+            int idx = zi * stride + xi;
+            float hL = (xi > 0)            ? mesh.vertices[zi * stride + (xi - 1)].pos.y : mesh.vertices[idx].pos.y;
+            float hR = (xi < gridSize)      ? mesh.vertices[zi * stride + (xi + 1)].pos.y : mesh.vertices[idx].pos.y;
+            float hD = (zi > 0)            ? mesh.vertices[(zi - 1) * stride + xi].pos.y : mesh.vertices[idx].pos.y;
+            float hU = (zi < gridSize)      ? mesh.vertices[(zi + 1) * stride + xi].pos.y : mesh.vertices[idx].pos.y;
+
+            glm::vec3 n(hL - hR, 2.0f * spacing, hD - hU);
+            float len = glm::length(n);
+            mesh.vertices[idx].normal = len > 0.0f ? n / len : glm::vec3(0.0f, 1.0f, 0.0f);
+            mesh.vertices[idx].color = terrainColor(mesh.vertices[idx].pos.y, heightScale);
+        }
+    }
+}
+
 }

@@ -1,8 +1,9 @@
-#include "procedural/world/WorldStore.h"
+#include "WorldStore.h"
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <algorithm>
 #include <sys/stat.h>
 
 #ifdef _WIN32
@@ -70,6 +71,49 @@ void WorldStore::addObject(const ChunkCoord& cc, const StoredObject& obj) {
     save(cc);
 }
 
+bool WorldStore::hasTerrainDeltas(const ChunkCoord& cc) const {
+    auto it = terrainDeltas_.find(cc);
+    return it != terrainDeltas_.end() && !it->second.empty();
+}
+
+const std::vector<TerrainDelta>& WorldStore::getTerrainDeltas(const ChunkCoord& cc) const {
+    static const std::vector<TerrainDelta> empty;
+    auto it = terrainDeltas_.find(cc);
+    return it != terrainDeltas_.end() ? it->second : empty;
+}
+
+void WorldStore::addTerrainDeltaInternal(const ChunkCoord& cc, int32_t localX, int32_t localZ,
+                                          float newHeight) {
+    auto& deltas = terrainDeltas_[cc];
+    for (auto& d : deltas) {
+        if (d.localX == localX && d.localZ == localZ) {
+            d.newHeight = newHeight;
+            return;
+        }
+    }
+    deltas.push_back({localX, localZ, newHeight});
+}
+
+void WorldStore::addTerrainDelta(const ChunkCoord& cc, int32_t localX, int32_t localZ,
+                                  float newHeight, int gridSize) {
+    addTerrainDeltaInternal(cc, localX, localZ, newHeight);
+
+    if (localX == 0) {
+        addTerrainDeltaInternal({cc.x - 1, cc.z}, gridSize, localZ, newHeight);
+    }
+    if (localX == gridSize) {
+        addTerrainDeltaInternal({cc.x + 1, cc.z}, 0, localZ, newHeight);
+    }
+    if (localZ == 0) {
+        addTerrainDeltaInternal({cc.x, cc.z - 1}, localX, gridSize, newHeight);
+    }
+    if (localZ == gridSize) {
+        addTerrainDeltaInternal({cc.x, cc.z + 1}, localX, 0, newHeight);
+    }
+
+    save(cc);
+}
+
 uint32_t WorldStore::ObjectTypeFromChar(char c) {
     if (c == 'T') return 1;
     if (c == 'R') return 2;
@@ -86,13 +130,14 @@ void WorldStore::save(const ChunkCoord& cc) {
     ensureDir();
     auto& rems = removals_[cc];
     auto& adds = added_[cc];
-    if (rems.empty() && adds.empty()) return;
+    auto& terrains = terrainDeltas_[cc];
+    if (rems.empty() && adds.empty() && terrains.empty()) return;
 
     std::string path = filePath(cc);
     FILE* f = std::fopen(path.c_str(), "w");
     if (!f) return;
 
-    std::fprintf(f, "PENGINE_DELTA_V2\n");
+    std::fprintf(f, "PENGINE_DELTA_V3\n");
     std::fprintf(f, "seed %llu\n", static_cast<unsigned long long>(worldSeed_));
     std::fprintf(f, "chunk %d %d\n", cc.x, cc.z);
     for (uint64_t key : rems) {
@@ -108,6 +153,9 @@ void WorldStore::save(const ChunkCoord& cc) {
             obj.scaleX, obj.scaleY, obj.scaleZ,
             static_cast<unsigned long long>(obj.seed));
     }
+    for (const auto& td : terrains) {
+        std::fprintf(f, "terrain %d %d %.6f\n", td.localX, td.localZ, td.newHeight);
+    }
     std::fclose(f);
 }
 
@@ -121,12 +169,14 @@ void WorldStore::load(const ChunkCoord& cc) {
 
     bool isV1 = std::strstr(line, "PENGINE_DELTA_V1") != nullptr;
     bool isV2 = std::strstr(line, "PENGINE_DELTA_V2") != nullptr;
-    if (!isV1 && !isV2) { std::fclose(f); return; }
+    bool isV3 = std::strstr(line, "PENGINE_DELTA_V3") != nullptr;
+    if (!isV1 && !isV2 && !isV3) { std::fclose(f); return; }
 
     WorldSeed fileSeed = 0;
     ChunkCoord fileCC = {};
     std::vector<uint64_t> keys;
     std::vector<StoredObject> objects;
+    std::vector<TerrainDelta> terrains;
 
     while (std::fgets(line, sizeof(line), f)) {
         if (std::strncmp(line, "seed ", 5) == 0) {
@@ -135,7 +185,7 @@ void WorldStore::load(const ChunkCoord& cc) {
             std::sscanf(line + 6, "%d %d", &fileCC.x, &fileCC.z);
         } else if (std::strncmp(line, "remove ", 7) == 0) {
             keys.push_back(static_cast<uint64_t>(std::strtoull(line + 7, nullptr, 10)));
-        } else if (isV2 && std::strncmp(line, "add ", 4) == 0) {
+        } else if ((isV2 || isV3) && std::strncmp(line, "add ", 4) == 0) {
             StoredObject obj;
             char typeChar = '?';
             int n = std::sscanf(line + 4, "%llu %llu %c %f %f %f %f %f %f %f %llu",
@@ -148,6 +198,11 @@ void WorldStore::load(const ChunkCoord& cc) {
                 obj.type = ObjectTypeFromChar(typeChar);
                 objects.push_back(obj);
             }
+        } else if (isV3 && std::strncmp(line, "terrain ", 8) == 0) {
+            TerrainDelta td;
+            if (std::sscanf(line + 8, "%d %d %f", &td.localX, &td.localZ, &td.newHeight) == 3) {
+                terrains.push_back(td);
+            }
         }
     }
     std::fclose(f);
@@ -155,6 +210,7 @@ void WorldStore::load(const ChunkCoord& cc) {
     if (fileSeed == worldSeed_ && fileCC == cc) {
         if (!keys.empty()) removals_[cc] = std::move(keys);
         if (!objects.empty()) added_[cc] = std::move(objects);
+        if (!terrains.empty()) terrainDeltas_[cc] = std::move(terrains);
     }
 }
 
@@ -203,6 +259,9 @@ bool WorldStore::isEmpty() const {
         if (!list.empty()) return false;
     }
     for (auto& [cc, list] : added_) {
+        if (!list.empty()) return false;
+    }
+    for (auto& [cc, list] : terrainDeltas_) {
         if (!list.empty()) return false;
     }
     return true;

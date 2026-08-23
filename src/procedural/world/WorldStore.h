@@ -1,6 +1,7 @@
 #pragma once
 
 #include "procedural/world/ChunkCoord.h"
+#include "procedural/world/TerrainDelta.h"
 #include "procedural/world/WorldSeed.h"
 #include <cstdint>
 #include <string>
@@ -32,6 +33,11 @@ public:
     const std::vector<StoredObject>& getAddedObjects(const ChunkCoord& cc) const;
     void addObject(const ChunkCoord& cc, const StoredObject& obj);
 
+    bool hasTerrainDeltas(const ChunkCoord& cc) const;
+    const std::vector<TerrainDelta>& getTerrainDeltas(const ChunkCoord& cc) const;
+    void addTerrainDelta(const ChunkCoord& cc, int32_t localX, int32_t localZ,
+                         float newHeight, int gridSize);
+
     void save(const ChunkCoord& cc);
     void load(const ChunkCoord& cc);
     void loadAll();
@@ -44,11 +50,14 @@ public:
 private:
     std::string filePath(const ChunkCoord& cc) const;
     void ensureDir() const;
+    void addTerrainDeltaInternal(const ChunkCoord& cc, int32_t localX, int32_t localZ,
+                                 float newHeight);
 
     WorldSeed worldSeed_ = 0;
     std::string saveDir_;
     std::unordered_map<ChunkCoord, std::vector<uint64_t>, ChunkCoordHash> removals_;
     std::unordered_map<ChunkCoord, std::vector<StoredObject>, ChunkCoordHash> added_;
+    std::unordered_map<ChunkCoord, std::vector<TerrainDelta>, ChunkCoordHash> terrainDeltas_;
 };
 
 }

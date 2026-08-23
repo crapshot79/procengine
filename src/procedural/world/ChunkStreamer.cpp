@@ -1,5 +1,6 @@
 #include "procedural/world/ChunkStreamer.h"
 #include "procedural/world/WorldStore.h"
+#include "procedural/world/TerrainDelta.h"
 #include "procedural/vegetation/TreeGenerator.h"
 #include "procedural/rock/RockGenerator.h"
 #include "engine/renderer/Renderer.h"
@@ -67,8 +68,17 @@ void ChunkStreamer::loadChunk(const ChunkCoord& cc, Renderer& renderer) {
     state.placements = placer.place(world_, cc);
 
     std::vector<uint64_t> removedKeys;
+    std::vector<TerrainDelta> terrainDeltas;
     if (store_) {
         removedKeys = store_->getRemovals(cc);
+        terrainDeltas = store_->getTerrainDeltas(cc);
+    }
+
+    if (!terrainDeltas.empty()) {
+        ChunkGenerator::applyDeltas(state.mesh, terrainDeltas,
+                                     ChunkGenerator::DEFAULT_GRID_SIZE, chunkSize_, heightScale_);
+        ChunkGenerator::recomputeNormalsAndColors(state.mesh, ChunkGenerator::DEFAULT_GRID_SIZE,
+                                                   chunkSize_, heightScale_);
     }
 
     auto isRemoved = [&](const PlacedObject& obj) -> bool {

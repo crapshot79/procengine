@@ -3,8 +3,10 @@
 #include "engine/renderer/Mesh.h"
 #include "procedural/core/Seed.h"
 #include "procedural/world/ChunkCoord.h"
+#include "procedural/world/TerrainDelta.h"
 #include "procedural/world/WorldSeed.h"
 #include <cstdint>
+#include <vector>
 
 namespace procengine {
 
@@ -22,6 +24,12 @@ public:
 
     static float queryHeight(WorldSeed world, float wx, float wz,
                              float heightScale = DEFAULT_HEIGHT_SCALE);
+
+    static void applyDeltas(MeshData& mesh, const std::vector<TerrainDelta>& deltas,
+                            int gridSize, float chunkSize, float heightScale);
+
+    static void recomputeNormalsAndColors(MeshData& mesh, int gridSize, float chunkSize,
+                                          float heightScale);
 };
 
 }

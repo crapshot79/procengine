@@ -102,7 +102,8 @@ add_executable(procengine-test
     src/test/test_chunk_dump.cpp
     src/test/test_chunk_placer.cpp
     src/test/test_chunk_streamer.cpp
-    src/test/test_world_store.cpp)
+    src/test/test_world_store.cpp
+    src/test/test_terrain_delta.cpp)
 target_link_libraries(procengine-test PRIVATE procengine)
 
 add_custom_command(TARGET procengine-demo POST_BUILD

@@ -21,6 +21,12 @@ using namespace procengine;
 int main(int argc, char* argv[]) {
     try {
         Seed worldSeed = 42;
+        bool testTerrain = false;
+        bool testQuitAfter = false;
+        for (int i = 1; i < argc; ++i) {
+            if (std::string(argv[i]) == "--test-terrain") testTerrain = true;
+            if (std::string(argv[i]) == "--test-terrain-quit") { testTerrain = true; testQuitAfter = true; }
+        }
 
         Window window(1280, 720, "ProcEngine - M1 persistent world");
         Renderer renderer(window.getHandle());
@@ -50,8 +56,56 @@ int main(int argc, char* argv[]) {
         std::cout << "  WASD: move  Mouse: look  SPACE/SHIFT: up/down" << std::endl;
         std::cout << "  E: remove nearest tree" << std::endl;
         std::cout << "  R: place persistent rock ahead" << std::endl;
+        std::cout << "  Q: raise terrain  Z: lower terrain" << std::endl;
         std::cout << "  Save dir: saves/  Seed: " << worldSeed << std::endl;
         std::cout << "============================" << std::endl;
+
+        if (testTerrain) {
+            streamer.update(camera.getPosition(), renderer);
+
+            bool hasExistingDeltas = false;
+            for (auto& [cc, state] : streamer.getLoaded()) {
+                if (store.hasTerrainDeltas(cc)) { hasExistingDeltas = true; break; }
+            }
+
+            if (hasExistingDeltas) {
+                std::cout << "  Terrain deltas loaded from save. Verifying..." << std::endl;
+                for (auto& [cc, state] : streamer.getLoaded()) {
+                    if (store.hasTerrainDeltas(cc)) {
+                        auto& deltas = store.getTerrainDeltas(cc);
+                        std::cout << "    Chunk (" << cc.x << "," << cc.z
+                                  << "): " << deltas.size() << " delta(s)" << std::endl;
+                    }
+                }
+                std::cout << "  TERRAIN PERSISTENCE OK." << std::endl;
+            } else {
+                float modX = 16.0f, modZ = 16.0f;
+                ChunkCoord tCC = streamer.worldToChunk(modX, modZ);
+                float spacing = chunkSize / static_cast<float>(ChunkGenerator::DEFAULT_GRID_SIZE);
+                float localXf = (modX - static_cast<float>(tCC.x) * chunkSize) / spacing;
+                float localZf = (modZ - static_cast<float>(tCC.z) * chunkSize) / spacing;
+                int32_t localX = static_cast<int32_t>(std::round(localXf));
+                int32_t localZ = static_cast<int32_t>(std::round(localZf));
+
+                float baseH = ChunkGenerator::queryHeight(worldSeed, modX, modZ, heightScale);
+                float newH = baseH + 2.0f;
+
+                store.addTerrainDelta(tCC, localX, localZ, newH,
+                                       ChunkGenerator::DEFAULT_GRID_SIZE);
+                streamer.reloadChunk(tCC, renderer);
+
+                std::cout << "  TERRAIN MODIFIED at (" << modX << "," << modZ
+                          << ") in chunk (" << tCC.x << "," << tCC.z
+                          << "): " << baseH << " -> " << newH << std::endl;
+            }
+
+            if (testQuitAfter) {
+                std::cout << "  Quitting after terrain mod." << std::endl;
+                renderer.waitIdle();
+                streamer.shutdown(renderer);
+                return 0;
+            }
+        }
 
         while (running) {
             uint64_t currentTime = SDL_GetTicks();
@@ -154,6 +208,50 @@ int main(int argc, char* argv[]) {
                           << placePos.y << ", " << placePos.z
                           << ") in chunk (" << placeCC.x << "," << placeCC.z << ")" << std::endl;
             }
+
+            auto handleTerrainMod = [&](float deltaH) {
+                glm::vec3 camPos = camera.getPosition();
+                float yawRad = camera.getYaw() * 3.14159265f / 180.0f;
+                float pitchRad = camera.getPitch() * 3.14159265f / 180.0f;
+
+                glm::vec3 forward(
+                    std::cos(yawRad) * std::cos(pitchRad),
+                    std::sin(pitchRad),
+                    std::sin(yawRad) * std::cos(pitchRad));
+                forward = glm::normalize(forward);
+
+                float targetDist = 5.0f;
+                glm::vec3 targetPos = camPos + forward * targetDist;
+
+                ChunkCoord tCC = streamer.worldToChunk(targetPos.x, targetPos.z);
+                float spacing = chunkSize / static_cast<float>(ChunkGenerator::DEFAULT_GRID_SIZE);
+
+                float localXf = (targetPos.x - static_cast<float>(tCC.x) * chunkSize) / spacing;
+                float localZf = (targetPos.z - static_cast<float>(tCC.z) * chunkSize) / spacing;
+                int32_t localX = std::max(0, std::min(ChunkGenerator::DEFAULT_GRID_SIZE,
+                    static_cast<int32_t>(std::round(localXf))));
+                int32_t localZ = std::max(0, std::min(ChunkGenerator::DEFAULT_GRID_SIZE,
+                    static_cast<int32_t>(std::round(localZf))));
+
+                float baseH = ChunkGenerator::queryHeight(worldSeed, targetPos.x, targetPos.z, heightScale);
+                float newH = std::max(0.0f, baseH + deltaH);
+
+                store.addTerrainDelta(tCC, localX, localZ, newH,
+                                       ChunkGenerator::DEFAULT_GRID_SIZE);
+
+                streamer.reloadChunk(tCC, renderer);
+                if (localX == 0)                              streamer.reloadChunk({tCC.x - 1, tCC.z}, renderer);
+                if (localX == ChunkGenerator::DEFAULT_GRID_SIZE) streamer.reloadChunk({tCC.x + 1, tCC.z}, renderer);
+                if (localZ == 0)                              streamer.reloadChunk({tCC.x, tCC.z - 1}, renderer);
+                if (localZ == ChunkGenerator::DEFAULT_GRID_SIZE) streamer.reloadChunk({tCC.x, tCC.z + 1}, renderer);
+
+                std::cout << "  Terrain (" << localX << "," << localZ << ") in chunk ("
+                          << tCC.x << "," << tCC.z << "): "
+                          << baseH << " -> " << newH << std::endl;
+            };
+
+            if (input.isKeyPressed(SDLK_Q)) handleTerrainMod(1.0f);
+            if (input.isKeyPressed(SDLK_Z)) handleTerrainMod(-1.0f);
 
             streamer.update(camera.getPosition(), renderer);
 
