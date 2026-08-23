@@ -66,6 +66,7 @@ set(ENGINE_SOURCES
     src/procedural/world/WorldPlacer.cpp
     src/procedural/world/TerrainSurface.cpp
     src/procedural/world/ChunkGenerator.cpp
+    src/procedural/world/ChunkPlacer.cpp
 )
 
 add_library(procengine STATIC ${ENGINE_SOURCES})
@@ -96,7 +97,8 @@ add_executable(procengine-test
     src/test/test_main.cpp
     src/test/test_world_seed.cpp
     src/test/test_chunk_generator.cpp
-    src/test/test_chunk_dump.cpp)
+    src/test/test_chunk_dump.cpp
+    src/test/test_chunk_placer.cpp)
 target_link_libraries(procengine-test PRIVATE procengine)
 
 add_custom_command(TARGET procengine-demo POST_BUILD

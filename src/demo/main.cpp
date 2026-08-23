@@ -6,17 +6,15 @@
 #include "engine/input/Input.h"
 #include "procedural/core/Seed.h"
 #include "procedural/vegetation/TreeGenerator.h"
-#include "procedural/building/HouseGenerator.h"
 #include "procedural/rock/RockGenerator.h"
 #include "procedural/world/ChunkCoord.h"
 #include "procedural/world/ChunkGenerator.h"
+#include "procedural/world/ChunkPlacer.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 #include <vector>
-#include <algorithm>
-#include <cmath>
 
 using namespace procengine;
 
@@ -30,29 +28,69 @@ int main(int argc, char* argv[]) {
         Camera camera;
 
         ChunkGenerator chunkGen;
-        constexpr float chunkSize = ChunkGenerator::DEFAULT_CHUNK_SIZE;
-        constexpr int   gridSize  = ChunkGenerator::DEFAULT_GRID_SIZE;
+        ChunkPlacer placer;
+        TreeGenerator treeGen;
+        RockGenerator rockGen;
+
+        constexpr float chunkSize   = ChunkGenerator::DEFAULT_CHUNK_SIZE;
+        constexpr int   gridSize    = ChunkGenerator::DEFAULT_GRID_SIZE;
         constexpr float heightScale = 6.0f;
 
         int ringRadius = 1;
-        std::vector<GpuMesh> chunkMeshes;
-        std::vector<glm::mat4> chunkTransforms;
+
+        struct RenderEntry {
+            GpuMesh mesh;
+            glm::mat4 transform;
+        };
+
+        std::vector<RenderEntry> chunks;
+        std::vector<RenderEntry> trees;
+        std::vector<RenderEntry> rocks;
 
         std::cout << "=== Generating " << (2*ringRadius+1) << "x" << (2*ringRadius+1)
                   << " chunk ring (chunk size " << chunkSize << "m, grid " << gridSize
                   << "x" << gridSize << ", height scale " << heightScale << ") ===" << std::endl;
 
+        int totalTrees = 0;
+        int totalRocks = 0;
+
         for (int zi = -ringRadius; zi <= ringRadius; ++zi) {
             for (int xi = -ringRadius; xi <= ringRadius; ++xi) {
                 ChunkCoord cc{xi, zi};
-                MeshData m = chunkGen.generate(worldSeed, cc, chunkSize, gridSize, heightScale);
 
-                GpuMesh gpu = renderer.uploadMesh(m);
-                chunkMeshes.push_back(gpu);
-                chunkTransforms.push_back(glm::mat4(1.0f));
+                MeshData m = chunkGen.generate(worldSeed, cc, chunkSize, gridSize, heightScale);
+                chunks.push_back({renderer.uploadMesh(m), glm::mat4(1.0f)});
+
+                auto placed = placer.place(worldSeed, cc);
+
+                for (const auto& obj : placed) {
+                    MeshData objMesh;
+                    if (obj.type == PlacedType::Tree) {
+                        objMesh = treeGen.generate(obj.seed);
+                    } else {
+                        objMesh = rockGen.generate(obj.seed);
+                    }
+
+                    float meshMinY = computeMeshMinY(objMesh);
+                    float worldY = obj.position.y - meshMinY;
+                    glm::mat4 xform = glm::translate(glm::mat4(1.0f),
+                        glm::vec3(obj.position.x, worldY, obj.position.z));
+
+                    RenderEntry entry{renderer.uploadMesh(objMesh), xform};
+                    if (obj.type == PlacedType::Tree) {
+                        trees.push_back(entry);
+                        totalTrees++;
+                    } else {
+                        rocks.push_back(entry);
+                        totalRocks++;
+                    }
+                }
             }
         }
-        std::cout << "  Generated " << chunkMeshes.size() << " chunks." << std::endl;
+
+        std::cout << "  Chunks: " << chunks.size()
+                  << "  Trees: " << totalTrees
+                  << "  Rocks: " << totalRocks << std::endl;
 
         camera.setPosition(glm::vec3(48.0f, 25.0f, 48.0f));
         camera.setYaw(-135.0f);
@@ -93,9 +131,9 @@ int main(int argc, char* argv[]) {
             renderer.beginFrame();
 
             renderer.beginShadowPass(lightSpaceMatrix);
-            for (size_t i = 0; i < chunkMeshes.size(); ++i) {
-                renderer.shadowDrawMesh(chunkMeshes[i], chunkTransforms[i]);
-            }
+            for (auto& e : chunks)  renderer.shadowDrawMesh(e.mesh, e.transform);
+            for (auto& e : trees)  renderer.shadowDrawMesh(e.mesh, e.transform);
+            for (auto& e : rocks)  renderer.shadowDrawMesh(e.mesh, e.transform);
 
             UniformBufferObject ubo{};
             ubo.view = camera.getViewMatrix();
@@ -107,20 +145,31 @@ int main(int argc, char* argv[]) {
             ubo.lightColor = glm::vec3(1.0f, 0.88f, 0.68f);
             ubo.fogDensity = 0.003f;
             ubo.cameraPos = camera.getPosition();
-            renderer.updateUniformBuffer(ubo);
 
             renderer.beginScenePass();
-            for (size_t i = 0; i < chunkMeshes.size(); ++i) {
-                ubo.model = chunkTransforms[i];
+            for (auto& e : chunks) {
+                ubo.model = e.transform;
                 renderer.updateUniformBuffer(ubo);
-                renderer.drawMesh(chunkMeshes[i], ubo.model);
+                renderer.drawMesh(e.mesh, e.transform);
+            }
+            for (auto& e : trees) {
+                ubo.model = e.transform;
+                renderer.updateUniformBuffer(ubo);
+                renderer.drawMesh(e.mesh, e.transform);
+            }
+            for (auto& e : rocks) {
+                ubo.model = e.transform;
+                renderer.updateUniformBuffer(ubo);
+                renderer.drawMesh(e.mesh, e.transform);
             }
 
             renderer.endFrame();
         }
 
         renderer.waitIdle();
-        for (auto& m : chunkMeshes) renderer.destroyMesh(m);
+        for (auto& e : chunks) renderer.destroyMesh(e.mesh);
+        for (auto& e : trees) renderer.destroyMesh(e.mesh);
+        for (auto& e : rocks) renderer.destroyMesh(e.mesh);
 
     } catch (const std::exception& e) {
         std::cerr << "Fatal error: " << e.what() << std::endl;

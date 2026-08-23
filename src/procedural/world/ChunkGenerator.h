@@ -19,6 +19,9 @@ public:
                       float chunkSize = DEFAULT_CHUNK_SIZE,
                       int gridSize = DEFAULT_GRID_SIZE,
                       float heightScale = DEFAULT_HEIGHT_SCALE) const;
+
+    static float queryHeight(WorldSeed world, float wx, float wz,
+                             float heightScale = DEFAULT_HEIGHT_SCALE);
 };
 
 }

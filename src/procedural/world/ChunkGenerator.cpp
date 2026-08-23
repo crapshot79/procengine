@@ -135,4 +135,8 @@ MeshData ChunkGenerator::generate(WorldSeed world,
     return mesh;
 }
 
+float ChunkGenerator::queryHeight(WorldSeed world, float wx, float wz, float heightScale) {
+    return terrainHeight(world, wx, wz, heightScale);
+}
+
 }
