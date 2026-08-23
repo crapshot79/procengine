@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
                 int32_t localX = static_cast<int32_t>(std::round(localXf));
                 int32_t localZ = static_cast<int32_t>(std::round(localZf));
 
-                float baseH = ChunkGenerator::queryHeight(worldSeed, modX, modZ, heightScale);
+                float baseH = streamer.queryHeight(modX, modZ);
                 float newH = baseH + 2.0f;
 
                 store.addTerrainDelta(tCC, localX, localZ, newH,
@@ -95,12 +95,11 @@ int main(int argc, char* argv[]) {
                 streamer.reloadChunk(tCC, renderer);
 
                 std::cout << "  TERRAIN MODIFIED at (" << modX << "," << modZ
-                          << ") in chunk (" << tCC.x << "," << tCC.z
                           << "): " << baseH << " -> " << newH << std::endl;
             }
 
             if (testQuitAfter) {
-                std::cout << "  Quitting after terrain mod." << std::endl;
+                std::cout << "  Quitting." << std::endl;
                 renderer.waitIdle();
                 streamer.shutdown(renderer);
                 return 0;
@@ -177,7 +176,7 @@ int main(int argc, char* argv[]) {
                 float placeDist = 5.0f;
                 glm::vec3 placePos = camPos + forward * placeDist;
 
-                float terrainH = ChunkGenerator::queryHeight(worldSeed, placePos.x, placePos.z, heightScale);
+                float terrainH = streamer.queryHeight(placePos.x, placePos.z);
                 placePos.y = terrainH;
 
                 ChunkCoord placeCC = streamer.worldToChunk(placePos.x, placePos.z);
@@ -233,7 +232,7 @@ int main(int argc, char* argv[]) {
                 int32_t localZ = std::max(0, std::min(ChunkGenerator::DEFAULT_GRID_SIZE,
                     static_cast<int32_t>(std::round(localZf))));
 
-                float baseH = ChunkGenerator::queryHeight(worldSeed, targetPos.x, targetPos.z, heightScale);
+                float baseH = streamer.queryHeight(targetPos.x, targetPos.z);
                 float newH = std::max(0.0f, baseH + deltaH);
 
                 store.addTerrainDelta(tCC, localX, localZ, newH,

@@ -91,6 +91,11 @@ void ChunkStreamer::loadChunk(const ChunkCoord& cc, Renderer& renderer) {
 
     state.terrainMesh = renderer.uploadMesh(state.mesh);
 
+    state.surface.build(ChunkGenerator::DEFAULT_GRID_SIZE,
+                        chunkSize_ / ChunkGenerator::DEFAULT_GRID_SIZE,
+                        state.mesh.vertices.data(),
+                        static_cast<int>(state.mesh.vertices.size()));
+
     for (const auto& obj : state.placements) {
         if (isRemoved(obj)) continue;
 
@@ -164,6 +169,18 @@ void ChunkStreamer::shutdown(Renderer& renderer) {
     for (const auto& cc : all) {
         unloadChunk(cc, renderer);
     }
+}
+
+float ChunkStreamer::queryHeight(float wx, float wz) const {
+    ChunkCoord cc = worldToChunk(wx, wz);
+    auto it = loaded_.find(cc);
+    if (it != loaded_.end()) {
+        float halfChunk = chunkSize_ * 0.5f;
+        float localX = wx - static_cast<float>(cc.x) * chunkSize_ - halfChunk;
+        float localZ = wz - static_cast<float>(cc.z) * chunkSize_ - halfChunk;
+        return it->second.surface.getHeight(localX, localZ);
+    }
+    return ChunkGenerator::queryHeight(world_, wx, wz, heightScale_);
 }
 
 }

@@ -5,6 +5,7 @@
 #include "procedural/world/ChunkCoord.h"
 #include "procedural/world/ChunkGenerator.h"
 #include "procedural/world/ChunkPlacer.h"
+#include "procedural/world/TerrainSurface.h"
 #include "procedural/world/WorldSeed.h"
 #include <glm/glm.hpp>
 #include <unordered_map>
@@ -17,6 +18,7 @@ class WorldStore;
 struct ChunkState {
     MeshData mesh;
     std::vector<PlacedObject> placements;
+    TerrainSurface surface;
 
     struct ObjectGpu {
         GpuMesh mesh;
@@ -37,6 +39,8 @@ public:
 
     void update(const glm::vec3& cameraPos, class Renderer& renderer);
     void reloadChunk(const ChunkCoord& cc, Renderer& renderer);
+
+    float queryHeight(float wx, float wz) const;
 
     const std::unordered_map<ChunkCoord, ChunkState, ChunkCoordHash>& getLoaded() const { return loaded_; }
     size_t loadedCount() const { return loaded_.size(); }
