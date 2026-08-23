@@ -65,6 +65,7 @@ set(ENGINE_SOURCES
     src/procedural/rock/RockGenerator.cpp
     src/procedural/world/WorldPlacer.cpp
     src/procedural/world/TerrainSurface.cpp
+    src/procedural/world/ChunkGenerator.cpp
 )
 
 add_library(procengine STATIC ${ENGINE_SOURCES})
@@ -90,6 +91,13 @@ target_link_libraries(procengine PUBLIC
 add_executable(procengine-demo src/demo/main.cpp)
 target_link_libraries(procengine-demo PRIVATE procengine)
 add_dependencies(procengine-demo shaders)
+
+add_executable(procengine-test
+    src/test/test_main.cpp
+    src/test/test_world_seed.cpp
+    src/test/test_chunk_generator.cpp
+    src/test/test_chunk_dump.cpp)
+target_link_libraries(procengine-test PRIVATE procengine)
 
 add_custom_command(TARGET procengine-demo POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${SHADER_BUILD_DIR} $<TARGET_FILE_DIR:procengine-demo>/shaders
