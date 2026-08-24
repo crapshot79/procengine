@@ -9,6 +9,8 @@
 #include "procedural/world/ChunkGenerator.h"
 #include "procedural/world/ChunkPlacer.h"
 #include "procedural/world/ChunkStreamer.h"
+#include "procedural/world/BiomeGenerator.h"
+#include "procedural/world/Biome.h"
 #include "procedural/world/WorldStore.h"
 
 #include <glm/glm.hpp>
@@ -255,10 +257,25 @@ int main(int argc, char* argv[]) {
             streamer.update(camera.getPosition(), renderer);
 
             if (frameCount % 120 == 0) {
-                ChunkCoord camCC = streamer.worldToChunk(
-                    camera.getPosition().x, camera.getPosition().z);
+                glm::vec3 camPos = camera.getPosition();
+                ChunkCoord camCC = streamer.worldToChunk(camPos.x, camPos.z);
+                BiomeSample biome = BiomeGenerator::sampleBiome(worldSeed, camPos.x, camPos.z);
+                float treeDensity = BiomeGenerator::treeDensity(worldSeed, camPos.x, camPos.z);
+                float rockDensity = BiomeGenerator::rockDensity(worldSeed, camPos.x, camPos.z);
+                auto pct = [](float weight) {
+                    return static_cast<int>(std::round(weight * 100.0f));
+                };
+                auto count = [](float density) {
+                    return static_cast<int>(std::round(density));
+                };
+
                 std::cout << "  Camera chunk: (" << camCC.x << "," << camCC.z
                           << ")  loaded: " << streamer.loadedCount() << std::endl;
+                std::cout << "  Biome: Grassland " << pct(biome.grasslandWeight)
+                          << "% | Forest " << pct(biome.forestWeight)
+                          << "% | Highland " << pct(biome.highlandWeight)
+                          << "% | Trees: " << count(treeDensity)
+                          << " | Rocks: " << count(rockDensity) << std::endl;
             }
             frameCount++;
 

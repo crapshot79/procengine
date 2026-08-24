@@ -1,6 +1,7 @@
 #include "procedural/world/ChunkPlacer.h"
 #include "procedural/world/ChunkGenerator.h"
 #include "procedural/world/WorldSeed.h"
+#include "procedural/world/BiomeGenerator.h"
 
 #include <algorithm>
 #include <cmath>
@@ -51,14 +52,31 @@ void placeType(std::vector<PlacedObject>& out,
 
 std::vector<PlacedObject> ChunkPlacer::place(WorldSeed world, ChunkCoord cc, const Config& cfg) {
     std::vector<PlacedObject> result;
-    result.reserve(cfg.treeCount + cfg.rockCount);
+
+    float chunkX = static_cast<float>(cc.x) * cfg.chunkSize + cfg.chunkSize * 0.5f;
+    float chunkZ = static_cast<float>(cc.z) * cfg.chunkSize + cfg.chunkSize * 0.5f;
+
+    int treeCount = biomeTreeCount(world, chunkX, chunkZ);
+    int rockCount = biomeRockCount(world, chunkX, chunkZ);
+
+    result.reserve(treeCount + rockCount);
 
     placeType(result, world, cc, PlacedType::Tree, DOMAIN_TREE,
-              cfg.treeCount, cfg.treeSpacing, cfg.chunkSize, cfg.heightScale);
+              treeCount, cfg.treeSpacing, cfg.chunkSize, cfg.heightScale);
     placeType(result, world, cc, PlacedType::Rock, DOMAIN_ROCK,
-              cfg.rockCount, cfg.rockSpacing, cfg.chunkSize, cfg.heightScale);
+              rockCount, cfg.rockSpacing, cfg.chunkSize, cfg.heightScale);
 
     return result;
+}
+
+int ChunkPlacer::biomeTreeCount(WorldSeed world, float chunkX, float chunkZ) {
+    float density = BiomeGenerator::treeDensity(world, chunkX, chunkZ);
+    return std::max(0, static_cast<int>(density + 0.5f));
+}
+
+int ChunkPlacer::biomeRockCount(WorldSeed world, float chunkX, float chunkZ) {
+    float density = BiomeGenerator::rockDensity(world, chunkX, chunkZ);
+    return std::max(0, static_cast<int>(density + 0.5f));
 }
 
 }

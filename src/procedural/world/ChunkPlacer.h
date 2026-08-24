@@ -32,8 +32,10 @@ public:
         float rockSpacing  = 2.5f;
     };
 
-    std::vector<PlacedObject> place(WorldSeed world, ChunkCoord cc,
-                                     const Config& cfg = Config{});
+    std::vector<PlacedObject> place(WorldSeed world, ChunkCoord cc, const Config& cfg = Config{});
+
+    static int biomeTreeCount(WorldSeed world, float chunkX, float chunkZ);
+    static int biomeRockCount(WorldSeed world, float chunkX, float chunkZ);
 };
 
 }

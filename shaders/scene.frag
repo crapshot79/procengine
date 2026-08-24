@@ -128,7 +128,8 @@ vec3 terrainMaterial(vec3 pos, vec3 baseColor) {
     vec3 color = mix(grass, exposedSoil, smoothstep(0.42, 0.72, terrainPatch + slope * 0.65));
     color = mix(color, stone, smoothstep(0.58, 0.88, slope + height * 0.24));
     color *= 0.92 + fine * 0.16;
-    color += (baseColor - vec3(0.35, 0.45, 0.22)) * 0.14;
+    color = mix(color, baseColor, 0.94);
+    color *= 0.96 + fine * 0.08;
     return color;
 }
 

@@ -78,7 +78,7 @@ void ChunkStreamer::loadChunk(const ChunkCoord& cc, Renderer& renderer) {
         ChunkGenerator::applyDeltas(state.mesh, terrainDeltas,
                                      ChunkGenerator::DEFAULT_GRID_SIZE, chunkSize_, heightScale_);
         ChunkGenerator::recomputeNormalsAndColors(state.mesh, ChunkGenerator::DEFAULT_GRID_SIZE,
-                                                   chunkSize_, heightScale_);
+                                                   chunkSize_, heightScale_, world_);
     }
 
     auto isRemoved = [&](const PlacedObject& obj) -> bool {

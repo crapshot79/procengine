@@ -10,6 +10,8 @@
 
 namespace procengine {
 
+struct BiomeSample;
+
 class ChunkGenerator {
 public:
     static constexpr float DEFAULT_CHUNK_SIZE = 32.0f;
@@ -29,7 +31,9 @@ public:
                             int gridSize, float chunkSize, float heightScale);
 
     static void recomputeNormalsAndColors(MeshData& mesh, int gridSize, float chunkSize,
-                                          float heightScale);
+                                          float heightScale, WorldSeed world);
+
+    static glm::vec3 biomeColor(float height, float maxHeight, const BiomeSample& biome);
 };
 
 }

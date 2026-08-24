@@ -1,5 +1,7 @@
 #include "procedural/world/ChunkGenerator.h"
 #include "procedural/world/WorldSeed.h"
+#include "procedural/world/BiomeGenerator.h"
+#include "procedural/world/Biome.h"
 
 #include <cmath>
 #include <algorithm>
@@ -64,19 +66,48 @@ inline glm::vec3 terrainNormal(WorldSeed seed, float wx, float wz, float heightS
     return len > 0.0f ? n / len : glm::vec3(0.0f, 1.0f, 0.0f);
 }
 
-inline glm::vec3 terrainColor(float height, float maxHeight) {
-    float t = height / maxHeight;
+inline glm::vec3 grasslandColor(float t) {
     if (t < 0.15f) {
-        return glm::vec3(0.55f, 0.7f, 0.3f);
+        return glm::vec3(0.05f, 0.95f, 0.05f);
     } else if (t < 0.4f) {
         float s = (t - 0.15f) / 0.25f;
-        return glm::vec3(0.25f + s * 0.15f, 0.55f - s * 0.1f, 0.15f);
+        return glm::vec3(0.04f + s * 0.04f, 0.88f + s * 0.08f, 0.04f + s * 0.04f);
     } else if (t < 0.7f) {
         float s = (t - 0.4f) / 0.3f;
-        return glm::vec3(0.45f + s * 0.15f, 0.4f + s * 0.1f, 0.25f + s * 0.15f);
+        return glm::vec3(0.08f + s * 0.10f, 0.96f - s * 0.06f, 0.06f);
     } else {
         float s = (t - 0.7f) / 0.3f;
-        return glm::vec3(0.6f + s * 0.3f, 0.55f + s * 0.35f, 0.45f + s * 0.45f);
+        return glm::vec3(0.18f + s * 0.10f, 0.90f - s * 0.08f, 0.06f);
+    }
+}
+
+inline glm::vec3 forestColor(float t) {
+    if (t < 0.15f) {
+        return glm::vec3(0.00f, 0.16f, 0.04f);
+    } else if (t < 0.4f) {
+        float s = (t - 0.15f) / 0.25f;
+        return glm::vec3(0.00f, 0.12f + s * 0.08f, 0.03f + s * 0.04f);
+    } else if (t < 0.7f) {
+        float s = (t - 0.4f) / 0.3f;
+        return glm::vec3(0.01f + s * 0.03f, 0.20f + s * 0.08f, 0.06f + s * 0.05f);
+    } else {
+        float s = (t - 0.7f) / 0.3f;
+        return glm::vec3(0.04f + s * 0.04f, 0.28f + s * 0.08f, 0.10f + s * 0.06f);
+    }
+}
+
+inline glm::vec3 highlandColor(float t) {
+    if (t < 0.15f) {
+        return glm::vec3(0.44f, 0.36f, 0.26f);
+    } else if (t < 0.4f) {
+        float s = (t - 0.15f) / 0.25f;
+        return glm::vec3(0.42f + s * 0.18f, 0.36f + s * 0.16f, 0.28f + s * 0.14f);
+    } else if (t < 0.7f) {
+        float s = (t - 0.4f) / 0.3f;
+        return glm::vec3(0.60f + s * 0.16f, 0.52f + s * 0.14f, 0.42f + s * 0.14f);
+    } else {
+        float s = (t - 0.7f) / 0.3f;
+        return glm::vec3(0.76f + s * 0.16f, 0.66f + s * 0.16f, 0.56f + s * 0.16f);
     }
 }
 
@@ -108,8 +139,9 @@ MeshData ChunkGenerator::generate(WorldSeed world,
 
             float h = terrainHeight(world, wx, wz, heightScale);
 
+            BiomeSample biome = BiomeGenerator::sampleBiome(world, wx, wz);
             mesh.vertices[idx].pos = glm::vec3(wx, h, wz);
-            mesh.vertices[idx].color = terrainColor(h, heightScale);
+            mesh.vertices[idx].color = biomeColor(h, heightScale, biome);
             mesh.vertices[idx].normal = terrainNormal(world, wx, wz, heightScale, spacing);
             mesh.vertices[idx].materialType = MATERIAL_TERRAIN;
         }
@@ -139,6 +171,14 @@ float ChunkGenerator::queryHeight(WorldSeed world, float wx, float wz, float hei
     return terrainHeight(world, wx, wz, heightScale);
 }
 
+glm::vec3 ChunkGenerator::biomeColor(float height, float maxHeight, const BiomeSample& biome) {
+    float t = height / maxHeight;
+    glm::vec3 gc = grasslandColor(t);
+    glm::vec3 fc = forestColor(t);
+    glm::vec3 hc = highlandColor(t);
+    return gc * biome.grasslandWeight + fc * biome.forestWeight + hc * biome.highlandWeight;
+}
+
 void ChunkGenerator::applyDeltas(MeshData& mesh, const std::vector<TerrainDelta>& deltas,
                                   int gridSize, float chunkSize, float heightScale) {
     int stride = gridSize + 1;
@@ -151,7 +191,7 @@ void ChunkGenerator::applyDeltas(MeshData& mesh, const std::vector<TerrainDelta>
 }
 
 void ChunkGenerator::recomputeNormalsAndColors(MeshData& mesh, int gridSize, float chunkSize,
-                                                float heightScale) {
+                                                float heightScale, WorldSeed world) {
     int stride = gridSize + 1;
     float spacing = chunkSize / static_cast<float>(gridSize);
 
@@ -166,7 +206,11 @@ void ChunkGenerator::recomputeNormalsAndColors(MeshData& mesh, int gridSize, flo
             glm::vec3 n(hL - hR, 2.0f * spacing, hD - hU);
             float len = glm::length(n);
             mesh.vertices[idx].normal = len > 0.0f ? n / len : glm::vec3(0.0f, 1.0f, 0.0f);
-            mesh.vertices[idx].color = terrainColor(mesh.vertices[idx].pos.y, heightScale);
+
+            float wx = mesh.vertices[idx].pos.x;
+            float wz = mesh.vertices[idx].pos.z;
+            BiomeSample biome = BiomeGenerator::sampleBiome(world, wx, wz);
+            mesh.vertices[idx].color = biomeColor(mesh.vertices[idx].pos.y, heightScale, biome);
         }
     }
 }

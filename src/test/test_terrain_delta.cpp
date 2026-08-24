@@ -213,7 +213,7 @@ int testRecomputeNormalsAndColors() {
 
         std::vector<TerrainDelta> deltas = {{16, 16, 20.0f}};
         ChunkGenerator::applyDeltas(mesh, deltas, gridSize, chunkSize, heightScale);
-        ChunkGenerator::recomputeNormalsAndColors(mesh, gridSize, chunkSize, heightScale);
+        ChunkGenerator::recomputeNormalsAndColors(mesh, gridSize, chunkSize, heightScale, w);
 
         float newColorG = mesh.vertices[16 * (gridSize + 1) + 16].color.g;
         testCheck(newColorG != origColorG, "Color recomputed after delta");
@@ -239,7 +239,7 @@ int testRecomputeNormalsAndColors() {
 
         std::vector<TerrainDelta> deltas = {{16, 16, 20.0f}};
         ChunkGenerator::applyDeltas(mesh, deltas, gridSize, chunkSize, heightScale);
-        ChunkGenerator::recomputeNormalsAndColors(mesh, gridSize, chunkSize, heightScale);
+        ChunkGenerator::recomputeNormalsAndColors(mesh, gridSize, chunkSize, heightScale, w);
 
         glm::vec3 farNormal = mesh.vertices[5 * (gridSize + 1) + 5].normal;
         testCheck(glm::length(farNormal - origNormal) < 0.05f,
@@ -265,7 +265,7 @@ int testTerrainSurfaceQuery() {
 
         std::vector<TerrainDelta> deltas = {{16, 16, 15.0f}};
         ChunkGenerator::applyDeltas(mesh, deltas, gridSize, chunkSize, heightScale);
-        ChunkGenerator::recomputeNormalsAndColors(mesh, gridSize, chunkSize, heightScale);
+        ChunkGenerator::recomputeNormalsAndColors(mesh, gridSize, chunkSize, heightScale, w);
 
         TerrainSurface surface;
         surface.build(gridSize, chunkSize / gridSize, mesh.vertices.data(),
@@ -377,11 +377,11 @@ int testBorderSeamless() {
 
         std::vector<TerrainDelta> deltasA = {{gridSize, 16, 20.0f}};
         ChunkGenerator::applyDeltas(meshA, deltasA, gridSize, chunkSize, heightScale);
-        ChunkGenerator::recomputeNormalsAndColors(meshA, gridSize, chunkSize, heightScale);
+        ChunkGenerator::recomputeNormalsAndColors(meshA, gridSize, chunkSize, heightScale, w);
 
         std::vector<TerrainDelta> deltasB = {{0, 16, 20.0f}};
         ChunkGenerator::applyDeltas(meshB, deltasB, gridSize, chunkSize, heightScale);
-        ChunkGenerator::recomputeNormalsAndColors(meshB, gridSize, chunkSize, heightScale);
+        ChunkGenerator::recomputeNormalsAndColors(meshB, gridSize, chunkSize, heightScale, w);
 
         float hA_mod = meshA.vertices[16 * (gridSize + 1) + gridSize].pos.y;
         float hB_mod = meshB.vertices[16 * (gridSize + 1) + 0].pos.y;
