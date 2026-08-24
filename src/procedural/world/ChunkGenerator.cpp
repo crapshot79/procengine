@@ -41,17 +41,82 @@ inline float valueNoiseAt(WorldSeed seed, float wx, float wz) {
     return a + sz * (b - a);
 }
 
-inline float fbm(WorldSeed seed, float wx, float wz) {
-    float h = 0.0f;
-    h += valueNoiseAt(seed, wx * (1.0f / 8.0f),  wz * (1.0f / 8.0f))  * 0.5f;
-    h += valueNoiseAt(seed, wx * (1.0f / 4.0f),  wz * (1.0f / 4.0f))  * 0.25f;
-    h += valueNoiseAt(seed, wx * (1.0f / 2.0f),  wz * (1.0f / 2.0f))  * 0.125f;
-    h += valueNoiseAt(seed, wx * (1.0f / 1.0f),  wz * (1.0f / 1.0f))  * 0.0625f;
+struct TerrainCharacter {
+    float baseElevation;
+    float broadAmp;
+    float broadScale;
+    float hillAmp;
+    float hillScale;
+    float ridgeAmp;
+    float ridgeScale;
+    float detailAmp;
+    float detailScale;
+};
+
+constexpr TerrainCharacter GRASSLAND_TERRAIN{
+    0.42f,
+    0.26f, 72.0f,
+    0.30f, 18.0f,
+    0.00f, 160.0f,
+    0.06f, 9.0f
+};
+
+constexpr TerrainCharacter FOREST_TERRAIN{
+    0.50f,
+    0.40f, 64.0f,
+    0.66f, 15.0f,
+    0.28f, 30.0f,
+    0.11f, 8.0f
+};
+
+constexpr TerrainCharacter HIGHLAND_TERRAIN{
+    0.55f,
+    0.50f, 68.0f,
+    0.84f, 13.0f,
+    0.62f, 26.0f,
+    0.16f, 7.0f
+};
+
+inline float centeredNoise(WorldSeed seed, float wx, float wz, float scale) {
+    return valueNoiseAt(seed, wx / scale, wz / scale) - 0.5f;
+}
+
+inline float ridgedNoise(WorldSeed seed, float wx, float wz, float scale) {
+    float n = valueNoiseAt(seed, wx / scale, wz / scale);
+    return 1.0f - std::abs(n * 2.0f - 1.0f);
+}
+
+inline float terrainShape(WorldSeed seed, float wx, float wz, const TerrainCharacter& character,
+                          uint64_t domain) {
+    WorldSeed broadSeed = seed + domain + 0xA110ULL;
+    WorldSeed hillSeed = seed + domain + 0xB220ULL;
+    WorldSeed ridgeSeed = seed + domain + 0xC330ULL;
+    WorldSeed detailSeed = seed + domain + 0xD440ULL;
+
+    float h = character.baseElevation;
+    h += centeredNoise(broadSeed, wx, wz, character.broadScale) * character.broadAmp;
+    h += centeredNoise(hillSeed, wx, wz, character.hillScale) * character.hillAmp;
+    h += (ridgedNoise(ridgeSeed, wx, wz, character.ridgeScale) - 0.45f) * character.ridgeAmp;
+    h += centeredNoise(detailSeed, wx, wz, character.detailScale) * character.detailAmp;
     return h;
 }
 
+inline float biomeTerrainHeight(WorldSeed seed, float wx, float wz, float heightScale,
+                                 const BiomeSample& biome) {
+    float grassland = terrainShape(seed, wx, wz, GRASSLAND_TERRAIN, 0x10000ULL);
+    float forest = terrainShape(seed, wx, wz, FOREST_TERRAIN, 0x20000ULL);
+    float highland = terrainShape(seed, wx, wz, HIGHLAND_TERRAIN, 0x30000ULL);
+
+    float h = grassland * biome.grasslandWeight
+            + forest * biome.forestWeight
+            + highland * biome.highlandWeight;
+
+    return std::clamp(h, 0.0f, 1.0f) * heightScale;
+}
+
 inline float terrainHeight(WorldSeed seed, float wx, float wz, float heightScale) {
-    return fbm(seed, wx, wz) * heightScale;
+    BiomeSample biome = BiomeGenerator::sampleBiome(seed, wx, wz);
+    return biomeTerrainHeight(seed, wx, wz, heightScale, biome);
 }
 
 inline glm::vec3 terrainNormal(WorldSeed seed, float wx, float wz, float heightScale, float sampleStep) {
@@ -137,9 +202,9 @@ MeshData ChunkGenerator::generate(WorldSeed world,
             float wx = originX + static_cast<float>(xi) * spacing;
             float wz = originZ + static_cast<float>(zi) * spacing;
 
-            float h = terrainHeight(world, wx, wz, heightScale);
-
             BiomeSample biome = BiomeGenerator::sampleBiome(world, wx, wz);
+            float h = biomeTerrainHeight(world, wx, wz, heightScale, biome);
+
             mesh.vertices[idx].pos = glm::vec3(wx, h, wz);
             mesh.vertices[idx].color = biomeColor(h, heightScale, biome);
             mesh.vertices[idx].normal = terrainNormal(world, wx, wz, heightScale, spacing);

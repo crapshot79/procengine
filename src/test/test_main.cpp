@@ -10,6 +10,7 @@ int runTestChunkStreamer();
 int runTestWorldStore();
 int runTerrainDeltaTests();
 int runBiomeTests();
+int runMorphologyTests();
 
 }
 
@@ -30,6 +31,8 @@ int main() {
     total += procengine::runTerrainDeltaTests();
     std::printf("\n");
     total += procengine::runBiomeTests();
+    std::printf("\n");
+    total += procengine::runMorphologyTests();
 
     std::printf("\nTotal failures: %d\n", total);
     return total == 0 ? 0 : 1;
