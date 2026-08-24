@@ -6,10 +6,13 @@
 
 namespace procengine {
 
+struct BiomeSample;
+
 class RockGenerator {
 public:
     MeshData generate(Seed seed);
     MeshData generate(Seed seed, float radius, float scaleX, float scaleY, float scaleZ, float rotationY);
+    MeshData generate(Seed seed, const BiomeSample& biome);
 
 private:
     void addFace(MeshData& mesh,

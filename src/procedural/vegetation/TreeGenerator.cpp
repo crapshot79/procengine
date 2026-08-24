@@ -1,4 +1,5 @@
 #include "procedural/vegetation/TreeGenerator.h"
+#include "procedural/world/Biome.h"
 #include <cmath>
 #include <algorithm>
 
@@ -251,6 +252,43 @@ MeshData TreeGenerator::generate(Seed seed, float trunkHeight, float trunkRadius
 
         glm::vec3 puffCenter(std::cos(angle) * dist, crownCenterY + yOffset, std::sin(angle) * dist);
         addSphere(mesh, puffR, 8, 5, puffCenter, leafColor * glm::vec3(rng.range(0.9f, 1.1f), rng.range(0.9f, 1.1f), rng.range(0.85f, 1.0f)), 0.05f, MATERIAL_LEAVES);
+    }
+
+    return mesh;
+}
+
+MeshData TreeGenerator::generate(Seed seed, const BiomeSample& biome) {
+    float gt = biome.grasslandWeight;
+    float ft = biome.forestWeight;
+    float ht = biome.highlandWeight;
+
+    float trunkHMin = gt * 1.5f + ft * 2.5f + ht * 1.0f;
+    float trunkHMax = gt * 2.5f + ft * 4.0f + ht * 2.0f;
+    float trunkRMin = gt * 0.06f + ft * 0.10f + ht * 0.04f;
+    float trunkRMax = gt * 0.15f + ft * 0.25f + ht * 0.12f;
+    float crownRMin = gt * 0.6f + ft * 1.2f + ht * 0.3f;
+    float crownRMax = gt * 1.2f + ft * 2.2f + ht * 0.8f;
+
+    Rng rng(seed);
+    float trunkH = rng.range(trunkHMin, trunkHMax);
+    float trunkR = rng.range(trunkRMin, trunkRMax);
+    float crownR = rng.range(crownRMin, crownRMax);
+
+    MeshData mesh = generate(seed, trunkH, trunkR, crownR);
+
+    for (auto& v : mesh.vertices) {
+        if (v.materialType == MATERIAL_BARK) {
+            float darkBark = gt * 0.0f + ft * (-0.08f) + ht * 0.04f;
+            v.color = glm::clamp(v.color + glm::vec3(darkBark, darkBark * 0.7f, darkBark * 0.5f), 0.0f, 1.0f);
+        } else if (v.materialType == MATERIAL_LEAVES) {
+            float greenMul = gt * 1.0f + ft * 1.0f + ht * 0.7f;
+            float greyAdd = ht * 0.10f;
+            v.color = glm::clamp(glm::vec3(
+                v.color.x + greyAdd,
+                v.color.y * greenMul,
+                v.color.z + greyAdd * 0.5f
+            ), 0.0f, 1.0f);
+        }
     }
 
     return mesh;

@@ -106,7 +106,8 @@ add_executable(procengine-test
     src/test/test_world_store.cpp
     src/test/test_terrain_delta.cpp
     src/test/test_biome.cpp
-    src/test/test_morphology.cpp)
+    src/test/test_morphology.cpp
+    src/test/test_biome_identity.cpp)
 target_link_libraries(procengine-test PRIVATE procengine)
 
 add_custom_command(TARGET procengine-demo POST_BUILD

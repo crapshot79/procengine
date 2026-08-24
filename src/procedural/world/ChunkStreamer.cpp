@@ -1,6 +1,8 @@
 #include "procedural/world/ChunkStreamer.h"
 #include "procedural/world/WorldStore.h"
 #include "procedural/world/TerrainDelta.h"
+#include "procedural/world/BiomeGenerator.h"
+#include "procedural/world/Biome.h"
 #include "procedural/vegetation/TreeGenerator.h"
 #include "procedural/rock/RockGenerator.h"
 #include "engine/renderer/Renderer.h"
@@ -99,15 +101,19 @@ void ChunkStreamer::loadChunk(const ChunkCoord& cc, Renderer& renderer) {
     for (const auto& obj : state.placements) {
         if (isRemoved(obj)) continue;
 
+        BiomeSample biome = BiomeGenerator::sampleBiome(world_, obj.position.x, obj.position.z);
+
         MeshData objMesh;
         if (obj.type == PlacedType::Tree) {
-            objMesh = treeGen.generate(obj.seed);
+            objMesh = treeGen.generate(obj.seed, biome);
         } else {
-            objMesh = rockGen.generate(obj.seed);
+            objMesh = rockGen.generate(obj.seed, biome);
         }
 
         float meshMinY = computeMeshMinY(objMesh);
-        float worldY = obj.position.y - meshMinY;
+        float meshHeight = computeMeshMaxY(objMesh) - meshMinY;
+        float sink = (obj.type == PlacedType::Rock) ? meshHeight * 0.20f : 0.0f;
+        float worldY = obj.position.y - meshMinY - sink;
         glm::mat4 xform = glm::translate(glm::mat4(1.0f),
             glm::vec3(obj.position.x, worldY, obj.position.z));
 
@@ -120,15 +126,19 @@ void ChunkStreamer::loadChunk(const ChunkCoord& cc, Renderer& renderer) {
     if (store_) {
         auto& added = store_->getAddedObjects(cc);
         for (const auto& stored : added) {
+            BiomeSample storedBiome = BiomeGenerator::sampleBiome(world_, stored.posX, stored.posZ);
+
             MeshData objMesh;
             if (stored.type == 1) {
-                objMesh = treeGen.generate(stored.seed);
+                objMesh = treeGen.generate(stored.seed, storedBiome);
             } else {
-                objMesh = rockGen.generate(stored.seed);
+                objMesh = rockGen.generate(stored.seed, storedBiome);
             }
 
             float meshMinY = computeMeshMinY(objMesh);
-            float worldY = stored.posY - meshMinY;
+            float meshHeight = computeMeshMaxY(objMesh) - meshMinY;
+            float storedSink = (stored.type == 0) ? meshHeight * 0.20f : 0.0f;
+            float worldY = stored.posY - meshMinY - storedSink;
 
             glm::mat4 xform = glm::mat4(1.0f);
             xform = glm::translate(xform, glm::vec3(stored.posX, worldY, stored.posZ));

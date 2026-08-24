@@ -11,6 +11,7 @@ int runTestWorldStore();
 int runTerrainDeltaTests();
 int runBiomeTests();
 int runMorphologyTests();
+int runBiomeIdentityTests();
 
 }
 
@@ -33,6 +34,8 @@ int main() {
     total += procengine::runBiomeTests();
     std::printf("\n");
     total += procengine::runMorphologyTests();
+    std::printf("\n");
+    total += procengine::runBiomeIdentityTests();
 
     std::printf("\nTotal failures: %d\n", total);
     return total == 0 ? 0 : 1;

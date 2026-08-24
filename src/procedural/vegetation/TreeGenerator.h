@@ -7,10 +7,13 @@
 
 namespace procengine {
 
+struct BiomeSample;
+
 class TreeGenerator {
 public:
     MeshData generate(Seed seed);
     MeshData generate(Seed seed, float trunkHeight, float trunkRadius, float crownRadius);
+    MeshData generate(Seed seed, const BiomeSample& biome);
 
 private:
     void addCylinder(MeshData& mesh, float baseRadius, float topRadius, float height, int segments, const glm::vec3& offset, const glm::vec3& color, float colorVar, float materialType);

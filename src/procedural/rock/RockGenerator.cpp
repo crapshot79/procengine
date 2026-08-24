@@ -1,4 +1,5 @@
 #include "procedural/rock/RockGenerator.h"
+#include "procedural/world/Biome.h"
 #include <cmath>
 #include <algorithm>
 #include <unordered_map>
@@ -118,6 +119,37 @@ MeshData RockGenerator::generate(Seed seed, float radius, float scaleX, float sc
         mesh.indices.push_back(bottomIndex);
         mesh.indices.push_back(i0);
         mesh.indices.push_back(i1);
+    }
+
+    return mesh;
+}
+
+MeshData RockGenerator::generate(Seed seed, const BiomeSample& biome) {
+    float g = biome.grasslandWeight;
+    float f = biome.forestWeight;
+    float h = biome.highlandWeight;
+
+    float radiusMin = g * 0.3f + f * 0.5f + h * 0.8f;
+    float radiusMax = g * 0.8f + f * 1.2f + h * 2.0f;
+    float sxMin = g * 0.8f + f * 0.7f + h * 0.5f;
+    float sxMax = g * 1.2f + f * 1.3f + h * 1.8f;
+    float syMin = g * 0.3f + f * 0.4f + h * 0.5f;
+    float syMax = g * 0.6f + f * 0.8f + h * 1.2f;
+    float szMin = g * 0.8f + f * 0.7f + h * 0.5f;
+    float szMax = g * 1.2f + f * 1.3f + h * 1.8f;
+
+    Rng rng(seed);
+    float radius = rng.range(radiusMin, radiusMax);
+    float scaleX = rng.range(sxMin, sxMax);
+    float scaleY = rng.range(syMin, syMax);
+    float scaleZ = rng.range(szMin, szMax);
+    float rotY = rng.range(0.0f, 6.283f);
+
+    MeshData mesh = generate(seed, radius, scaleX, scaleY, scaleZ, rotY);
+
+    for (auto& v : mesh.vertices) {
+        float greyRock = h * 0.06f - f * 0.03f;
+        v.color = glm::clamp(v.color + glm::vec3(greyRock, greyRock, greyRock), 0.0f, 1.0f);
     }
 
     return mesh;
